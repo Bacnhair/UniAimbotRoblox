@@ -1,0 +1,310 @@
+local player = game.Players.LocalPlayer
+local mouse = player:GetMouse()
+local Aiming = false
+local TweenService = game:GetService("TweenService")
+
+local blendValue = 0.65
+local on = true
+
+local aimRadius = 100
+
+local ScreenGui = game.CoreGui:FindFirstChild("idk")
+if not ScreenGui then
+    ScreenGui = Instance.new("ScreenGui")
+    ScreenGui.Name = "idk"
+    ScreenGui.Parent = game.CoreGui
+end
+
+-- Check if Frame already exists and remove it
+local existingFrame = ScreenGui:FindFirstChild("AimFrame")
+if existingFrame then
+    existingFrame:Destroy()
+end
+
+local Frame = Instance.new("Frame")
+Frame.Name = "AimFrame"
+Frame.Size = UDim2.new(aimRadius / 1000, 0, aimRadius / 500, 0)
+Frame.Position = UDim2.new(0.5, 0, 0.5, 0)
+Frame.AnchorPoint = Vector2.new(0.5, 0.5)
+Frame.BackgroundTransparency = 0.7
+Frame.BorderSizePixel = 0
+Frame.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+Frame.Parent = ScreenGui
+
+local corner = Instance.new("UICorner")
+corner.CornerRadius = UDim.new(0.5, 0)  -- This will make the frame a circle
+corner.Parent = Frame
+
+local stroke = Instance.new("UIStroke")
+stroke.Thickness = 2  -- Adjust the thickness as needed
+stroke.Color = Color3.fromRGB(255, 255, 255)  -- Set the color of the stroke
+stroke.Transparency = 1  -- Make the stroke invisible at first
+stroke.Parent = Frame
+
+local target = nil
+
+-- Send a notification when the script is executed
+game.StarterGui:SetCore("SendNotification", {
+    Title = "Script executed",
+    Text = "Made by bacnhair",
+    Duration = 5
+})
+
+local function createBillboardGui(character, playerName, humanoid)
+    local billboardGui = Instance.new("BillboardGui")
+    billboardGui.Name = "PlayerInfo"
+    billboardGui.Adornee = character.PrimaryPart
+    billboardGui.Size = UDim2.new(3, 0, 1.5, 0)
+    billboardGui.StudsOffset = Vector3.new(0, 3, 0)
+    billboardGui.AlwaysOnTop = true
+
+    local textLabel = Instance.new("TextLabel")
+    textLabel.Size = UDim2.new(1, 0, 1, 0)
+    textLabel.BackgroundTransparency = 1
+    textLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+    textLabel.TextStrokeTransparency = 0
+    textLabel.Text = playerName .. ", " .. math.floor(humanoid.Health) .. " HP"
+    textLabel.Parent = billboardGui
+
+    billboardGui.Parent = character
+
+    -- Update the health text constantly
+    humanoid.HealthChanged:Connect(function(newHealth)
+        if textLabel then
+            textLabel.Text = playerName .. ", " .. math.floor(newHealth) .. " HP"
+        end
+    end)
+end
+
+local function highlightPlayerModels(player)
+    if player ~= game.Players.LocalPlayer and player.Character then
+        -- Remove old highlight (in case of team changes)
+        local oldHighlight = player.Character:FindFirstChild("Highlight")
+        if oldHighlight then
+            oldHighlight:Destroy()
+        end
+
+        -- Determine if teams are in use
+        local teamsInUse = false
+        for _, v in pairs(game.Players:GetPlayers()) do
+            if v.Team then
+                teamsInUse = true
+                break
+            end
+        end
+
+        -- Check if the player is a valid target
+        local highlight = Instance.new("Highlight", player.Character)
+        highlight.Name = "Highlight"
+        if player.Team then
+            highlight.FillColor = player.TeamColor.Color -- Use the player's team color
+        else
+            highlight.FillColor = Color3.fromRGB(255, 255, 255) -- Default to white if no team
+        end
+        highlight.FillTransparency = 0.4
+        highlight.OutlineTransparency = 1
+
+        local humanoid = player.Character:FindFirstChildOfClass("Humanoid")
+        if humanoid then
+            createBillboardGui(player.Character, player.Name, humanoid)
+        end
+    end
+end
+
+-- Remove all billboard GUIs
+local function removeAllBillboards()
+    for _, v in pairs(game.Players:GetPlayers()) do
+        if v.Character then
+            local billboard = v.Character:FindFirstChild("PlayerInfo")
+            if billboard then
+                billboard:Destroy()
+            end
+        end
+    end
+end
+
+-- Highlight all existing players
+local function highlightAllPlayers()
+    for _, v in pairs(game.Players:GetPlayers()) do
+        highlightPlayerModels(v)
+    end
+end
+
+-- Highlight new players when they join
+game.Players.PlayerAdded:Connect(function(newPlayer)
+    newPlayer.CharacterAdded:Connect(function()
+        wait(1) -- Small delay to ensure Character is loaded
+        highlightPlayerModels(newPlayer)
+    end)
+end)
+
+-- Highlight characters for all existing players and when they reset
+for _, v in pairs(game.Players:GetPlayers()) do
+    v.CharacterAdded:Connect(function()
+        wait(1) -- Small delay to ensure Character is loaded
+        highlightPlayerModels(v)
+    end)
+end
+
+function AimLock()
+    local closestTarget = nil
+    local shortestDistance = math.huge
+
+    local localCharacter = player.Character
+    if not localCharacter or not localCharacter.PrimaryPart then return end
+
+    local cam = workspace.CurrentCamera
+    local framePosition = Frame.AbsolutePosition
+    local frameSize = Frame.AbsoluteSize
+
+    -- Determine if teams are being used
+    local teamsInUse = false
+    for _, v in pairs(game.Players:GetPlayers()) do
+        if v.Team then
+            teamsInUse = true
+            break
+        end
+    end
+
+    for _, v in pairs(game.Players:GetPlayers()) do
+        if v ~= player and v.Character and v.Character.PrimaryPart then
+            local humanoid = v.Character:FindFirstChildOfClass("Humanoid")
+            local head = v.Character:FindFirstChild("Head")
+            local torso = v.Character:FindFirstChild("UpperTorso") or v.Character:FindFirstChild("Torso")
+
+            -- Team Check
+            local isEnemy = (not teamsInUse) or (v.Team ~= player.Team)
+
+            if isEnemy and humanoid and humanoid.Health > 0 and head and torso then
+                -- Calculate midpoint between Head and Torso
+                local aimPosition = torso.Position:Lerp(head.Position, blendValue)
+
+                local screenPos, onScreen = cam:WorldToViewportPoint(aimPosition)
+
+                -- Only target players inside the aim frame
+                local isInFrame =
+                    onScreen and
+                    screenPos.X >= framePosition.X and screenPos.X <= framePosition.X + frameSize.X and
+                    screenPos.Y >= framePosition.Y and screenPos.Y <= framePosition.Y + frameSize.Y and
+                    screenPos.Z > 0 -- Make sure target is in front of the camera
+
+                if isInFrame then
+                    local distanceToLocalPlayer = (aimPosition - localCharacter.PrimaryPart.Position).Magnitude
+
+                    -- Prioritize the closest player within the frame
+                    if distanceToLocalPlayer < shortestDistance then
+                        shortestDistance = distanceToLocalPlayer
+                        closestTarget = v
+                    end
+                end
+            end
+        end
+    end
+
+    -- Update the target
+    target = closestTarget
+
+    -- If a valid target is found, lock the camera onto them
+    if target and target.Character and target.Character.PrimaryPart then
+        local head = target.Character:FindFirstChild("Head")
+        local torso = target.Character:FindFirstChild("UpperTorso") or target.Character:FindFirstChild("Torso")
+
+        if head and torso then
+            local aimPosition = torso.Position:Lerp(head.Position, blendValue)
+            cam.CFrame = CFrame.new(cam.CFrame.Position, aimPosition)
+        end
+    end
+end
+
+local UserInputService = game:GetService("UserInputService")
+
+UserInputService.InputBegan:Connect(function(input, gameProcessed)
+    if input.KeyCode == Enum.KeyCode.E then
+        -- Prioritize the Aiming toggle
+        Aiming = not Aiming -- Toggle aiming state
+        if Aiming then
+            Frame.BackgroundColor3 = Color3.fromRGB(255, 0, 0) -- Red color when aiming
+        else
+            Frame.BackgroundColor3 = Color3.fromRGB(255, 255, 255) -- White color when not aiming
+            -- Reset the target when toggling off
+            target = nil
+        end
+    elseif not gameProcessed then
+        -- Handle other key inputs only if the input is not already processed by the game
+        if input.KeyCode == Enum.KeyCode.J then
+            -- Increase frame size
+            local newSize = Frame.Size + UDim2.new(0.02, 0, 0.04, 0)
+            if newSize.X.Scale <= 10 and newSize.Y.Scale <= 20 then
+                Frame.Size = newSize
+            end
+            stroke.Transparency = 0
+            wait(0.1)
+            stroke.Transparency = 1
+        elseif input.KeyCode == Enum.KeyCode.L then
+            -- Decrease frame size
+            local newSize = Frame.Size - UDim2.new(0.02, 0, 0.04, 0)
+            if newSize.X.Scale >= 0.02 and newSize.Y.Scale >= 0.04 then
+                Frame.Size = newSize
+            end
+            stroke.Transparency = 0
+            wait(0.1)
+            stroke.Transparency = 1
+        elseif input.KeyCode == Enum.KeyCode.K then
+            on = not on
+            if not on then
+                for _, v in pairs(game.Players:GetPlayers()) do
+                    local highlight = v.Character and v.Character:FindFirstChild("Highlight")
+                    if highlight then
+                        highlight.Enabled = false
+                    end
+                end
+                Frame.BackgroundTransparency = 1
+                removeAllBillboards()
+            else
+                -- Re-enable highlight, restore frame transparency, and enable aimlock
+                for _, v in pairs(game.Players:GetPlayers()) do
+                    local highlight = v.Character and v.Character:FindFirstChild("Highlight")
+                    if highlight then
+                        highlight.Enabled = true
+                    end
+                end
+                Frame.BackgroundTransparency = 0.7
+                highlightAllPlayers()
+            end
+        elseif input.KeyCode == Enum.KeyCode.Minus then
+            -- Decrease blendValue by 0.1, with a minimum of 0.1
+            blendValue = math.max(blendValue - 0.25, 0.1)
+            -- Send notification
+            game.StarterGui:SetCore("SendNotification", {
+                Title = "Blendvalue changed to " .. blendValue,
+                Text = "",
+                Duration = 3
+            })
+        elseif input.KeyCode == Enum.KeyCode.Equals then
+            -- Increase blendValue by 0.1, with a maximum of 2
+            blendValue = math.min(blendValue + 0.25, 2)
+            -- Send notification
+            game.StarterGui:SetCore("SendNotification", {
+                Title = "Blendvalue changed to " .. blendValue,
+                Text = "",
+                Duration = 3
+            })
+        end
+    end
+end)
+
+game:GetService("RunService").RenderStepped:Connect(function()
+    if Aiming then
+        AimLock()
+    end
+end)
+
+player.CharacterAdded:Connect(function()
+    if on then
+        wait(0.1) -- Small delay to ensure GUI is re-added
+        ScreenGui.Parent = game.CoreGui
+        highlightPlayerModels(player)
+    end
+end)
+
+highlightAllPlayers()
