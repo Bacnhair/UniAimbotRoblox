@@ -6,8 +6,6 @@ local TweenService = game:GetService("TweenService")
 local blendValue = 0.65
 local on = true
 
-local aimRadius = 100
-
 local ScreenGui = game.CoreGui:FindFirstChild("idk")
 if not ScreenGui then
     ScreenGui = Instance.new("ScreenGui")
@@ -31,13 +29,13 @@ Frame.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
 Frame.Parent = ScreenGui
 
 local corner = Instance.new("UICorner")
-corner.CornerRadius = UDim.new(0.5, 0) 
+corner.CornerRadius = UDim.new(0.5, 0)
 corner.Parent = Frame
 
 local stroke = Instance.new("UIStroke")
-stroke.Thickness = 2  
-stroke.Color = Color3.fromRGB(255, 255, 255)  
-stroke.Transparency = 1  
+stroke.Thickness = 2
+stroke.Color = Color3.fromRGB(255, 255, 255)
+stroke.Transparency = 1
 stroke.Parent = Frame
 
 local target = nil
@@ -91,9 +89,9 @@ local function highlightPlayerModels(player)
         local highlight = Instance.new("Highlight", player.Character)
         highlight.Name = "Highlight"
         if player.Team then
-            highlight.FillColor = player.TeamColor.Color 
+            highlight.FillColor = player.TeamColor.Color
         else
-            highlight.FillColor = Color3.fromRGB(255, 255, 255) 
+            highlight.FillColor = Color3.fromRGB(255, 255, 255)
         end
         highlight.FillTransparency = 0.4
         highlight.OutlineTransparency = 1
@@ -203,25 +201,23 @@ local UserInputService = game:GetService("UserInputService")
 
 UserInputService.InputBegan:Connect(function(input, gameProcessed)
     if input.KeyCode == Enum.KeyCode.E then
-        Aiming = not Aiming -
+        Aiming = not Aiming
         if Aiming then
-            Frame.BackgroundColor3 = Color3.fromRGB(255, 0, 0) 
+            Frame.BackgroundColor3 = Color3.fromRGB(255, 0, 0)
         else
-            Frame.BackgroundColor3 = Color3.fromRGB(255, 255, 255) -
+            Frame.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
             target = nil
         end
     elseif not gameProcessed then
         if input.KeyCode == Enum.KeyCode.J then
             local newSize = Frame.Size + UDim2.new(0, 50, 0, 50)
-            if newSize.X.Scale <= 50 and newSize.Y.Scale <= 50 then
-                Frame.Size = newSize
-            end
+            Frame.Size = newSize
             stroke.Transparency = 0
             wait(0.1)
             stroke.Transparency = 1
         elseif input.KeyCode == Enum.KeyCode.L then
-            local newSize = Frame.Size - UDim2.new(0.02, 0, 0.04, 0)
-            if newSize.X.Scale >= 50 and newSize.Y.Scale >= 50 then
+            local newSize = Frame.Size - UDim2.new(0, 50, 0, 50)
+            if newSize.X.Offset >= 50 and newSize.Y.Offset >= 50 then
                 Frame.Size = newSize
             end
             stroke.Transparency = 0
@@ -239,7 +235,6 @@ UserInputService.InputBegan:Connect(function(input, gameProcessed)
                 Frame.BackgroundTransparency = 1
                 removeAllBillboards()
             else
-                -- Re-enable highlight, restore frame transparency, and enable aimlock
                 for _, v in pairs(game.Players:GetPlayers()) do
                     local highlight = v.Character and v.Character:FindFirstChild("Highlight")
                     if highlight then
@@ -275,7 +270,7 @@ end)
 
 player.CharacterAdded:Connect(function()
     if on then
-        wait(0.1) -- Small delay to ensure GUI is re-added
+        wait(0.1)
         ScreenGui.Parent = game.CoreGui
         highlightPlayerModels(player)
     end
